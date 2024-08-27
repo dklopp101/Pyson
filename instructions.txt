@@ -1,0 +1,184 @@
+PYSON VIRTUAL MACHINE
+----------------------
+Pyson is an extremely basic language that runs on a virtual machine implemented in python.
+It uses a stack for working with data, a heap for storing data, separate call and loop stacks
+for handling subroutines and iteration. It only supports integers.
+
+Pyson resembles python in nature and c++ in syntax. It is compiled into Pyson Assembly Code
+which assembles into bytecode held in python lists which are interpreted by the PVM.
+
+
+COMPLETE PYSON BYTECODE INSTRUCTION SET:
+	MNEMONIC       OPCODE      NAME
+
+	DIE          1
+	NOP          2    
+	CALL         3
+	RET          4
+	JMP          5
+	JEQ          6
+	JNEQ
+	JLT
+	JGT
+	LOOP         7
+	LOOP_NEXT    8    
+	LOOP_BREAK   9
+	PUSH        10
+	POP         11
+	PUSHFH      12              Pushes value from heap onto stack.
+	POPTH       13              Pops value from stack to heap.
+	MOVTH       14            Copies value from stack to heap without popping.
+	STKTH       15              Does same as MOVTH except the second operand specifies an address from within the stack.
+	COPYH       16              Copies one value in heap to another address within the heap.
+	SETH        17
+	CMP         18
+	ADD         19
+	SUB         20
+	MUL         21
+	DIV         22
+	MOD
+	NSPCT       23
+
+	END:
+		Tells vm where to end program execution.
+		
+	NOP: NO OPERATION
+		No Operation, can be used to waste vm cycles.
+		
+	CALL(subroutineAddress): CALL_SUBROUTINE
+		Calls a subroutine at the address given as operand.
+		
+	RET: RETURN
+		Tells vm the currently executing subroutine has finished, returning control back to where the subroutine was called from.
+		
+	JMP(address): JUMP
+		Unconditional branch to instruction at address.
+
+	JEQ(address): JUMP_IF_EQUAL
+		Cconditional branch to instruction at address. If top 2 values on data stack are equal then it branches otherwise executes next instruction.
+		Values are left on stack and must be manually popped off.
+	
+	LOOP(endAddress, bodyAddress):
+		Sets a counter for a loop executing from bodyAddress ending on endAddress. These are held on the loop_stack.
+		Basically initialises a loop then begins the first iteration. Counter is the top value on data stack. This
+		must be pushed onto stack before calling LOOP. Loop count number is passed to LOOP instruction via data stack, is manually pushed onto stack before calling
+	
+	LOOP_NEXT:
+		Performs iteration counter check on currently executing loop, if loop has completed passes control to loopEnd otherwise increments the counter
+		and passes control back to the loop body, executing the next loop iteration.
+	
+	LOOP_BREAK:
+		Ends the currently executing loop and cleans up the loop stack.
+	
+	PUSH(value):
+		Pushes value onto the top of the work stack.
+	
+	POP:
+		Pops value off top of work stack.
+	
+	PUSHFH(heapSourceAddress): PUSH_FROM_HEAP
+		Pushes value at heapSourceAddress in heap onto the work stack.
+		
+	POPTH(heapDestinationAddress): POP_TO_HEAP
+		Pops value off top of stack into heapDestinationAddress.
+	
+	MOVTH(heapDestinationAddress): MOVE(COPY)_TO_HEAP
+		Same as POPTH but leaves value on the work stack.
+		
+	STKTH(heapDestinationAddress, stackSourceAddress): STACK_TO_HEAP
+		Does same as MOVTH except instead of the source being the top of work stack the source is stackSourceAddress in work stack.
+		
+	COPYH(heapDestinationAddress, heapSourceAddress): COPY_HEAP
+		Copies value in heap at heapDestinationAddress to heapSourceAddress in heap.
+		
+	SETH(heapDestinationAddress, value): SET_HEAP
+		Sets heapDestinationAddress in heap to be value.
+		
+	CMP:
+		Compares the top 2 values on the data stack then pushes the result code onto the stack.
+		result codes: 0=EQ, 1=LTHAN, 2=GTHAN
+	
+	ADD, SUB, MUL, DIV:
+		Performs arithmetic on the top 2 values in the stack pushing the result onto the stack.
+	
+	NSPCT(source, address): INSPECT
+		Prints to console the value at address within the source data structure.
+		
+		workStack = 1
+		heap      = 2
+		callStack = 3
+		loopStack = 4
+		program   = 5
+	
+		Example: "NSPCT 1 0" - this would print the value at workStack[0]
+		If address is -1 then the entire data structure will be printed.
+		If address is -2 then the top of a stack will be printed(only applicable to work, call and loop stacks).
+	
+PROGRAM RETURN CODES:
+ 10 - Invalid Operation Code.
+ 0  - Successful execution
+ 
+PYSON ASSEMBLY CODE (PYASM):
+	Very simple low level human representation of pyson bytecode.
+	So the language features instructions, values, labels and comments.
+	Comments are identical to python comments, designated by # character and only span one line.
+	Labels are designated by an identifier followed by colomn (label:).
+	
+	The example below makes a subroutine named push10 which will push the value 10 onto the stack 10 times when called.
+	it then starts execution pushing values 1 then 2 onto stack, adding them then calling push 10, then printing top 13 values of data stack.
+
+# create push10 subroutine
+push10:
+PUSH 10 # sets how many iterations the below loop will run
+LOOP x y # x= endAddress, y=bodyAddress
+y:
+PUSH 10 # push value 10 onto data stack.
+LOOP_NEXT # check if loop has completed.
+x:
+RET
+
+# execution begins here
+START
+
+PUSH 1
+PUSH 2
+ADD
+
+# call push10 then print top 13 values on the datastack.
+CALL push10
+PRINT_STACK 13
+
+# execution ends.
+END
+
+The above codes console output would be:
+1
+2
+3
+10
+10
+10
+10
+10
+10
+10
+10
+10
+10
+
+Pyson vm interprets the bytecode in the form of a python list of lists where each instruction is a list.
+
+[[10, 10],
+[LOOP, 4, 2],
+[10, 10],
+[LOOP_NEXT],
+[RET],
+[START],
+[10, 1],
+[10, 2],
+[ADD],
+[CALL, 0],
+[PRINT_STACK, 13],
+[END]]
+
+[[10, 10], [7, 4, 2], [10, 10], [8], [4], [0], [10, 1], [10, 2], [13], [3, 0], [17, 13], [1]]

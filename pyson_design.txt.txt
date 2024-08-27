@@ -1,0 +1,381 @@
+PYSON ASSEMBLY LANGUAGE
+------------------------
+PAL consists of values, labels, instructions and comments.
+
+Examine the following PAL example.
+
+add5: # add5 subroutine #
+PUSH 5 
+ADD
+RET
+
+main: # program execution start. #
+PUSH 10
+CALL add5
+NSPCT 1 -2 # print top of stack. #
+DIE # program execution ends here. #
+
+Each line represents an instruction, only one instruction is permitted per each line.
+INSTRUCTION OPERAND1 OPERAND2 OPERAND3
+An operand can be a value or a label. 
+
+Labels serve as a way to reference specific parts of the code.
+the main: label represents where execution will begin.
+
+Comments work identically to c++ comments /* comment */ but use # symbol for start and end delimiter
+instead of /* */
+
+PAL is assembled into PVM bytecode which is a list of lists in python that the PVM directly interprets.
+A label is just an identifier associated with a specific instruction(address) within this python list.
+
+
+Examine the following example:
+
+# create push10 subroutine #
+push10:
+PUSH 10 # sets how many iterations the below loop will run #
+LOOP loop_end loop_body
+loop_body:
+PUSH 10 # push value 10 onto data stack. #
+LCONT # check if loop has completed. #
+loop_end:
+RET
+
+# execution begins here #
+main:
+PUSH 1
+PUSH 2
+ADD
+
+# call push10 then print top 13 values on the stack.
+CALL push10
+NSPCT 1 -1 # print entire stack.
+
+# execution ends.
+DIE
+
+The above code's console output would be:
+1
+2
+3
+10
+10
+10
+10
+10
+10
+10
+10
+10
+10
+
+Next let's examine the entire PVM instruction set.
+
+	DIE          - end program execution.      
+	NOP          - no operation.
+	CALL         - call subroutine
+	RET          - return from subroutine.
+	JMP          - unconditional jump to instruction.
+	JE           - jump to instruction if equal.
+	JN           - jump to instruction if not equal.
+	JL           - jump to instruction if less than.
+	JG           - jump to instruction if greater than.
+	LOOP         - set up loop.
+	LCONT        - continue next loop iteration if iteration count not reached.
+	LBRK         - break out of loop.
+	PUSH         - push value onto stack.
+	POP          - pop value off stack.
+	POP2         - pops two values off stack.
+	POPN         - pop n values off stack.
+	PUSHFH       - push value onto stack from heap address.        
+	POPTH        - pop value from stack onto heap address.
+	MOVTH        - copy value from stack onto heap address.
+	STKTH        - copy value from stack to heap.
+	COPYH        - copy value from heap address to heap address.
+	SETH         - set value at heap address.
+	PSHFHH       - refer to specification below.
+	PSHFHS       - refer to specification below.
+	CMP          - compare top two values on stack then push result-code onto stack.
+	ADD          - add top two values on stack then push result onto stack.
+	SUB          - subtract top two values on stack then push result onto stack.
+	MUL          - multiply top two values on stack then push result onto stack.
+	DIV          - divide top two values on stack then push result onto stack.
+	MOD          - modulo top two values on stack then push result onto stack.
+	NSPCT        - prints specified address of specified PVM data structure.
+
+Instruction Operands and Usage:
+	END(no-operands):
+		Tells vm where to end program execution.
+		
+	NOP(no-operands):
+		No Operation, can be used to waste vm cycles.
+		
+	CALL(subroutineAddress):
+		Calls a subroutine at the address given as operand, supports recursion. 
+		
+	RET(no-operands):
+		Tells vm the currently executing subroutine has finished, returning control back to where the subroutine was called from.
+		
+	JMP(address): 
+		Unconditional branch to instruction at address.
+
+	JE(address):
+		Conditional branch to instruction at address. If top 2 values on data stack are equal then it branches otherwise executes next instruction.
+		Values are left on stack and must be manually popped off.
+
+	JN(address):
+		Same as above but for not-equal.
+
+	JL(address):
+		Same as above but for less-than.
+
+	JG(address):
+		Same as above but for greater-than.
+
+	LOOP(endAddress, bodyAddress):
+		Sets a counter for a loop executing from bodyAddress ending on endAddress. These are held on the loop_stack.
+		Basically initialises a loop then begins the first iteration. Counter is the top value on data stack. This
+		must be pushed onto stack before calling LOOP. Loop count number is passed to LOOP instruction via data stack, is manually pushed onto stack before calling.
+                Loops *can* be nested since loop control data is kept in a stack within the vm. NOTE THAT THE ITER COUNT IS AUTOMATICALLY POPPED OFF THE STACK.
+	
+	LCONT(no-operands):
+		Performs iteration counter check on currently executing loop, if loop has completed passes control to loopEnd otherwise increments the counter
+		and passes control back to the loop body, executing the next loop iteration.
+	
+	LBRK(no-operands):
+		Ends the currently executing loop and cleans up the loop stack.
+	
+	PUSH(value):
+		Pushes value onto the top of the work stack.
+	
+	POP(no-operands):
+		Pops value off top of work stack.
+	
+	POP2():
+		Pops two values off top of work stack.
+
+	POPN(n):
+		Pops n values off top of work stack.	
+
+	PUSHFH(heapSourceAddress): 
+		Pushes value at heapSourceAddress in heap onto the work stack.
+		
+	POPTH(heapDestinationAddress): 
+		Pops value off top of stack into heapDestinationAddress.
+	
+	MOVTH(heapDestinationAddress): 
+		Same as POPTH but leaves value on the work stack.
+		
+	STKTH(heapDestinationAddress, stackSourceAddress): 
+		Does same as MOVTH except instead of the source being the top of work stack the source is stackSourceAddress in work stack.
+		
+	COPYH(heapDestinationAddress, heapSourceAddress): 
+		Copies value in heap at heapDestinationAddress to heapSourceAddress in heap.
+		
+	SETH(heapDestinationAddress, value): 
+		Sets heapDestinationAddress in heap to be value.
+		
+	PSHFHH(heapAddress):
+		Takes a heap address, uses the value stored in that heap slot as the 			address for another heap slot who's value is pushed onto the work stack.
+
+	PSHFHS():
+		uses the value at top of stack as a heap address, uses the value stored in 		that heap slot as the address for another heap slot who's value is pushed 		onto the stack.
+	
+	CMP(no-operands):
+		Compares the top 2 values on the data stack then pushes the result code onto the stack.
+		result codes: 0=EQ, 1=LTHAN, 2=GTHAN
+	
+	ADD, SUB, MUL, DIV(no-operands):
+		Performs arithmetic on the top 2 values in the stack pushing the result onto the stack.
+	
+	NSPCT(source, address):
+		Prints to console the value at address within the source data structure.
+		
+		workStack = 1
+		heap      = 2
+		callStack = 3
+		program   = 4
+	
+		Example: "NSPCT 1 0" - this would print the value at workStack[0]
+		If address is -1 then the entire data structure will be printed.
+		If address is -2 then the top of a stack will be printed(only applicable to work, call and loop stacks).
+
+
+Pyson High-Level Language aka PYSON
+-------------------------
+Imperative/procedural language which compiles into pyasm. Note the lack of parens and how
+everything is delimited by a space. So x = y+7 isn't valid, x = y + 7 is.
+Curly braces are used to delimit blocks of code.
+
+Pyson consists of keywords, identifiers, values and operators.
+var - declares variable.
+sub - declares subroutine
+print - same as python print function.
+if, elif, else, while - obvious.
++-*/<>++!==>=< - obvious
+{} - start & end of code block.
+
+Example:
+
+var global_var = 10
+
+sub add_numbers a b {
+    var result = a + b
+    return result
+}
+
+sub main {
+    var num1 = 5
+    var num2 = 15
+    var sum = add_numbers num1 num2
+
+    print num1
+    print num2
+    print sum
+
+    if sum > global_var {
+        while global_var < sum {
+            global_var = global_var + 1
+        }
+    } else {
+        global_var = sum
+    }
+
+    print global_var
+}
+
+This assembled into PAL looks roughly like this:
+
+# add_numbers subroutine #
+add_numbers:
+PUSHFH 0  # Load first argument (a) from heap #
+PUSHFH 1  # Load second argument (b) from heap #
+ADD       # Add the two values #
+POPTH 2   # Store the result in heap address 2 #
+RET       # Return from subroutine #
+
+# main subroutine #
+main:
+PUSH 5
+POPTH 0   # Store num1 in heap address 0 #
+PUSH 15
+POPTH 1   # Store num2 in heap address 1 #
+
+CALL add_numbers  # Call add_numbers subroutine #
+
+PUSHFH 0  # Load num1 from heap #
+NSPCT 1 -2  # Print num1 #
+PUSHFH 1  # Load num2 from heap #
+NSPCT 1 -2  # Print num2 #
+PUSHFH 2  # Load sum from heap #
+NSPCT 1 -2  # Print sum #
+
+PUSHFH 2  # Load sum from heap #
+PUSH 10
+JGT greater_than_global_var
+
+# else branch #
+PUSHFH 2  # Load sum from heap #
+POPTH 3   # Store sum in global_var (heap address 3) #
+JMP end_if
+
+# if branch #
+greater_than_global_var:
+PUSHFH 2  # Load sum from heap #
+PUSHFH 3  # Load global_var from heap #
+SUB       # Calculate sum - global_var #
+POPTH 4   # Store the difference in heap address 4 #
+PUSHFH 4  # Load the difference from heap #
+LOOP while_loop_end while_loop_body
+
+while_loop_body:
+PUSHFH 3  # Load global_var from heap #
+PUSH 1
+ADD
+POPTH 3   # Increment global_var #
+LCONT     # Continue loop if not finished #
+
+while_loop_end:
+NOP
+
+end_if:
+PUSHFH 3  # Load global_var from heap #
+NSPCT 1 -2  # Print global_var #
+
+DIE  # End program execution #
+
+
+        if not in_comment:
+            # is token an instruction?
+            if tok in opmap.keys():
+                # found start of instruction so make new list and append to prog list.
+                instr = []
+                prog.append(instr)
+            
+                # append instruction opcode to instr list.
+                instr.append(opmap[tok])
+                
+            # is token a value?
+            elif isInteger(tok):
+                instr.append(int(tok))
+            
+            # is token a label declaration?
+            elif tok[-1] == ':':
+                # is it valid?
+                if len(tok) > 1:
+                    # is label name an instr mnemonic and therefore invalid?
+                    if tok in opmap.keys():
+                        raise Exception('label was instr mnemonic and therefore invalid.')
+                        # label was instr mnemonic and therefore invalid
+                    
+                    # valid label so make entry for it. we're labelling the next instruction
+                    # so it's index within the prog list is the current prog list len plus 1.
+                    # cut off the ':' off end of the label.
+                    label_map[tok[:-1]] = len(prog) + 1 
+                else:
+                    # label was too short.
+                    raise Exception('label too short')
+                    
+            # is token an instr label used as operand?
+            elif tok in label_map.keys():
+                instr.append(label_map[tok])
+    
+            # token isn't valid.
+            else:
+                raise Exception('invalid token')
+
+opmap = {'die'     :  0,
+         'nop'     :  1,
+         'call'    :  2,
+         'ret'     :  3,
+         'jmp'     :  4,
+         'je'      :  5,
+         'jn'      :  6,
+         'jl'      :  7,
+         'jg'      :  8,
+         'loop'    :  9,
+         'lcont'   : 10,
+         'lbrk'    : 11,
+         'push'    : 12,
+         'pop'     : 13,
+         'pop2'    : 14,
+         'popn'    : 15,
+         'pushfh'  : 16,
+         'popth'   : 17,
+         'movth'   : 18,
+         'stkth'   : 19,
+         'copyh'   : 20,
+         'seth'    : 21,
+         'pshfhh'  : 22,
+         'pshfhs'  : 23,
+         'cmp'     : 24,
+         'inc'     : 25,
+         'dec'     : 26,
+         'add'     : 27,
+         'sub'     : 28,
+         'mul'     : 29,
+         'div'     : 30,
+         'mod'     : 31,
+         'nspct'   : 32,
+	 'nspctst' : 33}
+
